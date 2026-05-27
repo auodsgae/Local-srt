@@ -52,3 +52,15 @@ Run this from a Windows PowerShell prompt after installing dependencies:
 
 The script builds `LocalSRT.exe` and `subtitle-worker.exe` with PyInstaller. The Inno Setup script in
 `packaging\local_srt.iss` can then produce a normal installer.
+
+## Small Online Installer
+
+For GitHub releases, use the online installer instead of uploading the full offline GPU build:
+
+```powershell
+.\scripts\build_online_installer.ps1
+```
+
+This creates `release\LocalSRT-OnlineInstaller-v0.1.0.zip`. The zip only contains setup scripts. When the user runs
+`Install-LocalSRT.cmd`, it downloads a private Python runtime, Local SRT, ffmpeg, and either the CPU or NVIDIA GPU speech
+runtime. Qwen speech models are still downloaded later on first transcription.

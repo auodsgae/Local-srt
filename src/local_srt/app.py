@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -29,6 +30,12 @@ def worker_command() -> list[str]:
     exe = base / "subtitle-worker.exe"
     if exe.exists():
         return [str(exe)]
+    if sys.platform == "win32":
+        python_exe = Path(sys.executable)
+        if python_exe.name.lower() == "pythonw.exe":
+            console_python = python_exe.with_name("python.exe")
+            if console_python.exists():
+                return [str(console_python), "-m", "local_srt.worker"]
     return [sys.executable, "-m", "local_srt.worker"]
 
 
@@ -85,6 +92,10 @@ def main() -> int:
             self.device_combo = QtWidgets.QComboBox()
             self.device_combo.addItem("GPU (NVIDIA CUDA)", "cuda")
             self.device_combo.addItem("CPU (slow)", "cpu")
+            default_device = os.environ.get("LOCAL_SRT_DEFAULT_DEVICE", "cuda")
+            default_device_index = self.device_combo.findData(default_device)
+            if default_device_index >= 0:
+                self.device_combo.setCurrentIndex(default_device_index)
             settings.addWidget(self.device_combo)
             settings.addStretch(1)
             layout.addLayout(settings)
