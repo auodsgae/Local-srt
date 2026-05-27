@@ -90,6 +90,7 @@ function Install-Source($AppDir, $TempDir) {
     Write-Step "Installing Local SRT app files"
     $sourceZip = Join-Path $TempDir "local-srt-source.zip"
     $expanded = Join-Path $TempDir "source"
+    $savedFfmpegDir = Join-Path $TempDir "existing-ffmpeg"
     if ($PayloadZip -and (Test-Path -LiteralPath $PayloadZip)) {
         Copy-Item -Force -LiteralPath $PayloadZip -Destination $sourceZip
     }
@@ -108,6 +109,10 @@ function Install-Source($AppDir, $TempDir) {
     }
 
     if (Test-Path $AppDir) {
+        $existingFfmpegDir = Join-Path $AppDir "ffmpeg"
+        if (Test-Path $existingFfmpegDir) {
+            Copy-Item -Recurse -Force $existingFfmpegDir $savedFfmpegDir
+        }
         Remove-Item -Recurse -Force $AppDir
     }
     New-Item -ItemType Directory -Force -Path $AppDir | Out-Null
@@ -117,6 +122,9 @@ function Install-Source($AppDir, $TempDir) {
     Copy-Item -Recurse -Force (Join-Path $sourceRoot.FullName "src") (Join-Path $AppDir "src")
     Copy-Item -Force (Join-Path $sourceRoot.FullName "pyproject.toml") (Join-Path $AppDir "pyproject.toml")
     Copy-Item -Force (Join-Path $sourceRoot.FullName "README.md") (Join-Path $AppDir "README.md")
+    if (Test-Path $savedFfmpegDir) {
+        Copy-Item -Recurse -Force $savedFfmpegDir (Join-Path $AppDir "ffmpeg")
+    }
 }
 
 function Install-Ffmpeg($AppDir, $TempDir) {
@@ -124,6 +132,16 @@ function Install-Ffmpeg($AppDir, $TempDir) {
     $ffmpegDir = Join-Path $AppDir "ffmpeg"
     $ffmpegExe = Join-Path $ffmpegDir "ffmpeg.exe"
     if (Test-Path $ffmpegExe) {
+        Write-Host "Using existing Local SRT ffmpeg: $ffmpegExe"
+        return
+    }
+
+    $systemFfmpeg = Get-Command ffmpeg.exe -ErrorAction SilentlyContinue
+    if (-not $systemFfmpeg) {
+        $systemFfmpeg = Get-Command ffmpeg -ErrorAction SilentlyContinue
+    }
+    if ($systemFfmpeg) {
+        Write-Host "Using ffmpeg already installed on this computer: $($systemFfmpeg.Source)"
         return
     }
 
