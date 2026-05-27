@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "local-srt"
+version = "0.1.0"
+description = "Local Windows audio/video to SRT subtitle app using Qwen3-ASR and Qwen3 ForcedAligner."
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    "numpy>=1.26",
+    "PySide6>=6.7",
+    "qwen-asr>=0.0.6",
+    "torch>=2.6",
+    "huggingface-hub>=0.25",
+    "opencc-python-reimplemented>=0.1.7",
+    "jieba>=0.42.1",
+    "wordfreq>=3.1.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pyinstaller>=6.8",
+]
+
+[project.scripts]
+subtitle-app = "local_srt.app:main"
+subtitle-worker = "local_srt.worker:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
