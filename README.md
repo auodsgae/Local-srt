@@ -67,3 +67,12 @@ runtime. Qwen speech models are still downloaded later on first transcription.
 
 For a tagged GitHub release, the workflow in `.github\workflows\release-online-installer.yml` builds this same small zip
 and attaches it to the release automatically.
+
+To build a double-clickable setup executable for local update testing:
+
+```powershell
+.\scripts\build_installer_exe.ps1
+```
+
+This creates `release\LocalSRT-Setup-v0.1.0.exe`. The executable contains the Local SRT source files, but still downloads
+Python, ffmpeg, the selected speech runtime, and the speech models later when needed.

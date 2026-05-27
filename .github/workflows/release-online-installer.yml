@@ -19,6 +19,10 @@ jobs:
         shell: pwsh
         run: .\scripts\build_online_installer.ps1 -SourceRef $env:GITHUB_REF_NAME
 
+      - name: Build setup executable
+        shell: pwsh
+        run: .\scripts\build_installer_exe.ps1 -SourceRef $env:GITHUB_REF_NAME
+
       - name: Create GitHub release
         shell: pwsh
         env:
@@ -26,6 +30,7 @@ jobs:
         run: |
           $version = (Select-String -Path "pyproject.toml" -Pattern '^version = "([^"]+)"$').Matches[0].Groups[1].Value
           $zip = "release\LocalSRT-OnlineInstaller-v$version.zip"
-          gh release create $env:GITHUB_REF_NAME $zip `
+          $exe = "release\LocalSRT-Setup-v$version.exe"
+          gh release create $env:GITHUB_REF_NAME $zip $exe `
             --title "Local SRT $env:GITHUB_REF_NAME" `
-            --notes "Small online installer for Local SRT. The installer downloads Python, ffmpeg, the selected CPU or NVIDIA GPU runtime, and downloads speech models later on first transcription."
+            --notes "Small online installers for Local SRT. They include the app source, download Python, ffmpeg, the selected CPU or NVIDIA GPU runtime, and download speech models later on first transcription."

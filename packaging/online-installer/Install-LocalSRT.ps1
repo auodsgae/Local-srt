@@ -1,6 +1,7 @@
 param(
     [string]$InstallRoot = "$env:LOCALAPPDATA\LocalSRT",
     [string]$SourceRef = "main",
+    [string]$PayloadZip = "",
     [ValidateSet("ask", "cpu", "cuda")]
     [string]$Runtime = "ask",
     [switch]$NoDesktopShortcut
@@ -86,10 +87,15 @@ function Install-Python($PythonDir, $TempDir) {
 }
 
 function Install-Source($AppDir, $TempDir) {
-    Write-Step "Downloading Local SRT app files"
+    Write-Step "Installing Local SRT app files"
     $sourceZip = Join-Path $TempDir "local-srt-source.zip"
     $expanded = Join-Path $TempDir "source"
-    Download-File $SourceZipUrl $sourceZip
+    if ($PayloadZip -and (Test-Path -LiteralPath $PayloadZip)) {
+        Copy-Item -Force -LiteralPath $PayloadZip -Destination $sourceZip
+    }
+    else {
+        Download-File $SourceZipUrl $sourceZip
+    }
     Expand-Archive -Force -Path $sourceZip -DestinationPath $expanded
     $sourceRoot = Get-ChildItem -Path $expanded -Directory | Select-Object -First 1
     if (-not $sourceRoot) {
