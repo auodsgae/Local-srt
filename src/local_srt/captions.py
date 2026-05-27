@@ -194,6 +194,8 @@ def _needs_space(output: str, token: str, *, force_space: bool) -> bool:
     if output[-1] in ASCII_SPACE_AFTER and current_latin:
         return True
     previous_latin = _contains_latin(output[-1])
+    if _contains_cjk(output[-1]) and current_latin:
+        return True
     if previous_latin and current_latin:
         return not _should_join_english_fragments(_last_latin_word(output), token)
     return False

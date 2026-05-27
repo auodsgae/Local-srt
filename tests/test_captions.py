@@ -53,6 +53,21 @@ class CaptionTests(unittest.TestCase):
         )
         self.assertEqual(subtitles[0].text, "This works.")
 
+    def test_mixed_chinese_english_spacing(self):
+        subtitles = transcript_to_subtitles_for_tests(
+            [
+                ("\u6211", 0.00, 0.10),
+                ("\u7528", 0.10, 0.20),
+                ("local", 0.20, 0.30),
+                ("SRT", 0.30, 0.40),
+                ("\u5de5", 0.40, 0.50),
+                ("\u5177", 0.50, 0.60),
+                ("export", 0.60, 0.70),
+                ("file", 0.70, 0.80),
+            ]
+        )
+        self.assertEqual(subtitles[0].text, "\u6211\u7528 local SRT\u5de5\u5177 export file")
+
     def test_ambiguous_english_fragments_join_when_common_word(self):
         subtitles = transcript_to_subtitles_for_tests(
             [
