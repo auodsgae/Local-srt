@@ -53,7 +53,7 @@ Run this from a Windows PowerShell prompt after installing dependencies:
 The script builds `LocalSRT.exe` and `subtitle-worker.exe` with PyInstaller. The Inno Setup script in
 `packaging\local_srt.iss` can then produce a normal installer.
 
-## Small Online Installer
+## Small Online and Portable Installer
 
 For GitHub releases, use the online installer instead of uploading the full offline GPU build:
 
@@ -61,9 +61,15 @@ For GitHub releases, use the online installer instead of uploading the full offl
 .\scripts\build_online_installer.ps1
 ```
 
-This creates `release\LocalSRT-OnlineInstaller-v0.1.0.zip`. The zip only contains setup scripts. When the user runs
-`Install-LocalSRT.cmd`, it downloads a private Python runtime, Local SRT, ffmpeg, and either the CPU or NVIDIA GPU speech
-runtime. Qwen speech models are still downloaded later on first transcription.
+This creates `release\LocalSRT-OnlineInstaller-v0.1.1.zip`. The zip contains setup scripts and a small copy of the
+Local SRT source, but not Python, PyTorch, ffmpeg, or speech models.
+
+For a portable install, the user unzips it where they want the app to live and runs
+`Install-LocalSRT-Portable.cmd`. It downloads an embeddable Python runtime, ffmpeg, and either the CPU or NVIDIA GPU
+speech runtime into that folder. It then creates `LocalSRT.cmd`; app data and Qwen speech models stay under the local
+`data` folder. Qwen speech models are still downloaded later on first transcription.
+
+For a normal per-user install, the user runs `Install-LocalSRT.cmd`.
 
 For a tagged GitHub release, the workflow in `.github\workflows\release-online-installer.yml` builds this same small zip
 and attaches it to the release automatically.

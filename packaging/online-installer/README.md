@@ -2,10 +2,15 @@
 
 This is the small release package for Local SRT.
 
-Run `Install-LocalSRT.cmd` on a Windows computer. The installer downloads:
+For a portable install, unzip this folder where you want Local SRT to live, then run
+`Install-LocalSRT-Portable.cmd`. It downloads everything into this same folder and later creates
+`LocalSRT.cmd`, which launches the app. App data and speech models stay in the local `data` folder.
 
-- a private Python runtime
-- the Local SRT app source
+For a normal per-user install, run `Install-LocalSRT.cmd`.
+
+This package includes a small copy of the Local SRT source. The portable installer downloads:
+
+- an embeddable Python runtime
 - only the selected PyTorch runtime, CPU or NVIDIA GPU
 - ffmpeg
 

@@ -49,6 +49,9 @@ SUPPORTED_INPUT_EXTENSIONS = VIDEO_EXTENSIONS | AUDIO_EXTENSIONS
 
 
 def app_data_dir() -> Path:
+    portable_root = os.environ.get("LOCAL_SRT_APP_DATA")
+    if portable_root:
+        return Path(portable_root).expanduser()
     if sys.platform == "win32":
         root = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
         if root:
@@ -66,4 +69,3 @@ def bundled_base_dir() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
     return Path(__file__).resolve().parents[2]
-

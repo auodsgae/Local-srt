@@ -33,4 +33,4 @@ jobs:
           $exe = "release\LocalSRT-Setup-v$version.exe"
           gh release create $env:GITHUB_REF_NAME $zip $exe `
             --title "Local SRT $env:GITHUB_REF_NAME" `
-            --notes "Small online installers for Local SRT. They include the app source, download Python, ffmpeg, the selected CPU or NVIDIA GPU runtime, and download speech models later on first transcription."
+            --notes "Small online installers for Local SRT. Use Install-LocalSRT-Portable.cmd from the zip for a portable folder install. The installers download Python, ffmpeg, the selected CPU or NVIDIA GPU runtime, and download speech models later on first transcription."

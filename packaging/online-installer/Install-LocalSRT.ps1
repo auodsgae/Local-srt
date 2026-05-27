@@ -1,9 +1,10 @@
 param(
-    [string]$InstallRoot = "$env:LOCALAPPDATA\LocalSRT",
+    [string]$InstallRoot = "",
     [string]$SourceRef = "main",
     [string]$PayloadZip = "",
     [ValidateSet("ask", "cpu", "cuda")]
     [string]$Runtime = "ask",
+    [switch]$Portable,
     [switch]$NoDesktopShortcut
 )
 
@@ -18,6 +19,8 @@ else {
     $SourceZipUrl = "https://github.com/$Repository/archive/refs/heads/$SourceRef.zip"
 }
 $PythonInstallerUrl = "https://www.python.org/ftp/python/$PythonVersion/python-$PythonVersion-amd64.exe"
+$PythonEmbedZipUrl = "https://www.python.org/ftp/python/$PythonVersion/python-$PythonVersion-embed-amd64.zip"
+$GetPipUrl = "https://bootstrap.pypa.io/get-pip.py"
 $FfmpegZipUrl = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
 
 function Write-Step($Message) {
@@ -33,14 +36,95 @@ function Require-64BitWindows {
 
 function Download-File($Url, $Destination) {
     Write-Host "Downloading $Url"
-    Invoke-WebRequest -Uri $Url -OutFile $Destination -UseBasicParsing
+    $parent = Split-Path -Parent $Destination
+    if ($parent) {
+        New-Item -ItemType Directory -Force -Path $parent | Out-Null
+    }
+
+    try {
+        Invoke-WebRequest `
+            -Uri $Url `
+            -OutFile $Destination `
+            -UseBasicParsing `
+            -MaximumRedirection 10 `
+            -TimeoutSec 120 `
+            -Headers @{ "User-Agent" = "LocalSRT-Installer" }
+        return
+    }
+    catch {
+        Write-Host "PowerShell download failed: $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host "Trying .NET downloader..." -ForegroundColor Yellow
+    }
+
+    try {
+        $handler = New-Object System.Net.Http.HttpClientHandler
+        $handler.AllowAutoRedirect = $true
+        $client = New-Object System.Net.Http.HttpClient($handler)
+        $client.Timeout = [TimeSpan]::FromMinutes(10)
+        $client.DefaultRequestHeaders.UserAgent.ParseAdd("LocalSRT-Installer")
+        $response = $client.GetAsync($Url).GetAwaiter().GetResult()
+        $response.EnsureSuccessStatusCode() | Out-Null
+        $stream = $response.Content.ReadAsStreamAsync().GetAwaiter().GetResult()
+        $file = [IO.File]::Create($Destination)
+        try {
+            $stream.CopyTo($file)
+        }
+        finally {
+            $file.Dispose()
+            $stream.Dispose()
+            $client.Dispose()
+            $handler.Dispose()
+        }
+    }
+    catch {
+        throw "Could not download $Url to $Destination. $($_.Exception.Message)"
+    }
 }
 
 function Run-Command($FilePath, [string[]]$Arguments) {
     Write-Host "> $FilePath $($Arguments -join ' ')"
-    & $FilePath @Arguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "Command failed with exit code ${LASTEXITCODE}: $FilePath"
+    $process = Start-Process `
+        -FilePath $FilePath `
+        -ArgumentList (Join-ProcessArguments $Arguments) `
+        -Wait `
+        -PassThru `
+        -NoNewWindow
+
+    $exitCode = $process.ExitCode
+    if ($exitCode -ne 0) {
+        throw "Command failed with exit code ${exitCode}: $FilePath"
+    }
+}
+
+function Join-ProcessArguments([string[]]$Arguments) {
+    $quoted = foreach ($arg in $Arguments) {
+        if ($arg -match '[\s"]') {
+            '"' + ($arg -replace '"', '\"') + '"'
+        }
+        else {
+            $arg
+        }
+    }
+    return ($quoted -join " ")
+}
+
+function Run-ProcessCommand($FilePath, [string[]]$Arguments, [int[]]$AllowedExitCodes = @(0), [string]$FailureLog = "") {
+    Write-Host "> $FilePath $($Arguments -join ' ')"
+    $process = Start-Process `
+        -FilePath $FilePath `
+        -ArgumentList (Join-ProcessArguments $Arguments) `
+        -Wait `
+        -PassThru `
+        -NoNewWindow
+
+    $exitCode = $process.ExitCode
+    if ($AllowedExitCodes -notcontains $exitCode) {
+        if ($FailureLog -and (Test-Path $FailureLog)) {
+            Write-Host ""
+            Write-Host "Last lines from installer log:" -ForegroundColor Yellow
+            Get-Content -Tail 40 -Path $FailureLog | ForEach-Object { Write-Host $_ }
+        }
+        throw "Command failed with exit code ${exitCode}: $FilePath"
     }
 }
 
@@ -60,28 +144,115 @@ function Choose-Runtime {
     return "cpu"
 }
 
-function Install-Python($PythonDir, $TempDir) {
+function Test-PythonRuntime($PythonExe) {
+    if (-not (Test-Path $PythonExe)) {
+        return $false
+    }
+    try {
+        $global:LASTEXITCODE = 0
+        & $PythonExe --version > $null 2>&1
+        return ($global:LASTEXITCODE -eq 0)
+    }
+    catch {
+        return $false
+    }
+}
+
+function Test-PythonPip($PythonExe) {
+    if (-not (Test-PythonRuntime $PythonExe)) {
+        return $false
+    }
+    try {
+        $global:LASTEXITCODE = 0
+        & $PythonExe -m pip --version > $null 2>&1
+        return ($global:LASTEXITCODE -eq 0)
+    }
+    catch {
+        return $false
+    }
+}
+
+function Enable-EmbeddedPythonSitePackages($PythonDir) {
+    $pth = Get-ChildItem -Path $PythonDir -Filter "python*._pth" | Select-Object -First 1
+    if (-not $pth) {
+        return
+    }
+
+    $text = Get-Content -Raw -Path $pth.FullName
+    $text = $text -replace "#import site", "import site"
+    Set-Content -Encoding ASCII -Path $pth.FullName -Value $text
+}
+
+function Install-EmbeddedPython($PythonDir, $TempDir) {
+    Write-Step "Installing portable Python runtime"
+    if (Test-Path $PythonDir) {
+        Remove-DirectoryBestEffort $PythonDir
+    }
+    New-Item -ItemType Directory -Force -Path $PythonDir | Out-Null
+
+    $embedZip = Join-Path $TempDir "python-embed.zip"
+    $getPip = Join-Path $TempDir "get-pip.py"
+    Download-File $PythonEmbedZipUrl $embedZip
+    Expand-Archive -Force -Path $embedZip -DestinationPath $PythonDir
+    Enable-EmbeddedPythonSitePackages $PythonDir
+
     $pythonExe = Join-Path $PythonDir "python.exe"
-    if (Test-Path $pythonExe) {
+    if (-not (Test-PythonRuntime $pythonExe)) {
+        throw "Portable Python was not installed correctly."
+    }
+
+    Download-File $GetPipUrl $getPip
+    Run-Command $pythonExe @($getPip, "--no-warn-script-location")
+
+    if (-not (Test-Path (Join-Path $PythonDir "Scripts\pip.exe"))) {
+        Run-Command $pythonExe @("-m", "pip", "--version")
+    }
+    return $pythonExe
+}
+
+function Show-LogTail($Path) {
+    if ($Path -and (Test-Path $Path)) {
+        Write-Host ""
+        Write-Host "Last lines from installer log:" -ForegroundColor Yellow
+        Get-Content -Tail 40 -Path $Path | ForEach-Object { Write-Host $_ }
+    }
+}
+
+function Install-Python($PythonDir, $TempDir, [bool]$PreferEmbeddedPython) {
+    $pythonExe = Join-Path $PythonDir "python.exe"
+    if (Test-PythonPip $pythonExe) {
         return $pythonExe
     }
 
+    if ($PreferEmbeddedPython) {
+        return Install-EmbeddedPython $PythonDir $TempDir
+    }
+
     Write-Step "Installing private Python runtime"
+    if (Test-Path $PythonDir) {
+        Write-Host "Removing incomplete Python runtime folder: $PythonDir"
+        Remove-DirectoryBestEffort $PythonDir
+    }
     New-Item -ItemType Directory -Force -Path $PythonDir | Out-Null
     $installer = Join-Path $TempDir "python-installer.exe"
+    $installerLog = Join-Path $TempDir "python-installer.log"
     Download-File $PythonInstallerUrl $installer
-    Run-Command $installer @(
+    Run-ProcessCommand $installer @(
         "/quiet",
         "InstallAllUsers=0",
         "TargetDir=$PythonDir",
         "Include_launcher=0",
         "Include_pip=1",
         "Include_test=0",
-        "PrependPath=0"
-    )
+        "PrependPath=0",
+        "/log",
+        $installerLog
+    ) @(0, 3010) $installerLog
 
-    if (-not (Test-Path $pythonExe)) {
-        throw "Python was not installed correctly."
+    if (-not (Test-PythonRuntime $pythonExe)) {
+        Show-LogTail $installerLog
+        Write-Host "Python installer did not create a runnable private Python. Falling back to portable Python." -ForegroundColor Yellow
+        return Install-EmbeddedPython $PythonDir $TempDir
     }
     return $pythonExe
 }
@@ -158,34 +329,55 @@ function Install-Ffmpeg($AppDir, $TempDir) {
     Copy-Item -Force $downloadedExe.FullName $ffmpegExe
 }
 
-function Install-PythonPackages($PythonExe, $VenvDir, $AppDir, $SelectedRuntime) {
+function Install-PythonPackages($PythonExe, $VenvDir, $AppDir, $SelectedRuntime, [bool]$UsePortableRuntime) {
     Write-Step "Installing Local SRT runtime"
-    if (-not (Test-Path $VenvDir)) {
-        Run-Command $PythonExe @("-m", "venv", $VenvDir)
-    }
-
-    $venvPython = Join-Path $VenvDir "Scripts\python.exe"
-    Run-Command $venvPython @("-m", "pip", "install", "--upgrade", "--no-cache-dir", "pip", "setuptools", "wheel")
-
-    if ($SelectedRuntime -eq "cuda") {
-        Run-Command $venvPython @("-m", "pip", "install", "--no-cache-dir", "torch", "--index-url", "https://download.pytorch.org/whl/cu128")
+    if ($UsePortableRuntime) {
+        $runtimePython = $PythonExe
     }
     else {
-        Run-Command $venvPython @("-m", "pip", "install", "--no-cache-dir", "torch", "--index-url", "https://download.pytorch.org/whl/cpu")
+        if (-not (Test-Path $VenvDir)) {
+            Run-Command $PythonExe @("-m", "venv", $VenvDir)
+        }
+        $runtimePython = Join-Path $VenvDir "Scripts\python.exe"
     }
 
-    Run-Command $venvPython @("-m", "pip", "install", "--no-cache-dir", "hf_xet", "-e", $AppDir)
-    Run-Command $venvPython @("-m", "pip", "cache", "purge")
+    Run-Command $runtimePython @("-m", "pip", "install", "--upgrade", "--no-cache-dir", "pip", "setuptools", "wheel")
+
+    if ($SelectedRuntime -eq "cuda") {
+        Run-Command $runtimePython @("-m", "pip", "install", "--no-cache-dir", "torch", "--index-url", "https://download.pytorch.org/whl/cu128")
+    }
+    else {
+        Run-Command $runtimePython @("-m", "pip", "install", "--no-cache-dir", "torch", "--index-url", "https://download.pytorch.org/whl/cpu")
+    }
+
+    if ($UsePortableRuntime) {
+        Run-Command $runtimePython @("-m", "pip", "install", "--no-cache-dir", "hf_xet", $AppDir)
+    }
+    else {
+        Run-Command $runtimePython @("-m", "pip", "install", "--no-cache-dir", "hf_xet", "-e", $AppDir)
+    }
+    Run-Command $runtimePython @("-m", "pip", "cache", "purge")
+    return $runtimePython
 }
 
-function Write-Launcher($InstallRoot, $AppDir, $SelectedRuntime) {
+function Write-Launcher($InstallRoot, $SelectedRuntime, [bool]$UsePortableRuntime) {
     Write-Step "Creating launcher"
     $launcher = Join-Path $InstallRoot "LocalSRT.cmd"
+    if ($UsePortableRuntime) {
+        $pythonw = "%LOCAL_SRT_ROOT%python\pythonw.exe"
+        $appDataLine = 'set "LOCAL_SRT_APP_DATA=%LOCAL_SRT_ROOT%data"'
+    }
+    else {
+        $pythonw = "%LOCAL_SRT_ROOT%.venv\Scripts\pythonw.exe"
+        $appDataLine = ""
+    }
     $launcherText = @"
 @echo off
-set "PATH=$AppDir\ffmpeg;%PATH%"
+set "LOCAL_SRT_ROOT=%~dp0"
+set "PATH=%LOCAL_SRT_ROOT%app\ffmpeg;%PATH%"
 set "LOCAL_SRT_DEFAULT_DEVICE=$SelectedRuntime"
-start "Local SRT" "$InstallRoot\.venv\Scripts\pythonw.exe" -m local_srt
+$appDataLine
+start "Local SRT" "$pythonw" -m local_srt
 "@
     Set-Content -Encoding ASCII -Path $launcher -Value $launcherText
     return $launcher
@@ -210,8 +402,39 @@ function Create-Shortcuts($Launcher, $InstallRoot) {
     }
 }
 
+function Remove-DirectoryBestEffort($Path) {
+    if (-not (Test-Path $Path)) {
+        return
+    }
+
+    for ($attempt = 1; $attempt -le 5; $attempt++) {
+        try {
+            Remove-Item -Recurse -Force $Path -ErrorAction Stop
+            return
+        }
+        catch {
+            if ($attempt -lt 5) {
+                Start-Sleep -Seconds 2
+            }
+            else {
+                Write-Host "Could not remove temporary setup folder. It is safe to delete later:" -ForegroundColor Yellow
+                Write-Host "  $Path" -ForegroundColor Yellow
+            }
+        }
+    }
+}
+
 Require-64BitWindows
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+if (-not $InstallRoot) {
+    if ($Portable) {
+        $InstallRoot = $PSScriptRoot
+    }
+    else {
+        $InstallRoot = "$env:LOCALAPPDATA\LocalSRT"
+    }
+}
 
 $selectedRuntime = Choose-Runtime
 $installRootPath = [IO.Path]::GetFullPath($InstallRoot)
@@ -227,20 +450,29 @@ try {
     Write-Host "Local SRT will be installed to:"
     Write-Host "  $installRootPath"
     Write-Host "Runtime choice: $selectedRuntime"
+    if ($Portable) {
+        Write-Host "Portable mode: app data and speech models will stay inside this folder."
+    }
 
     Install-Source $appDir $tempDir
-    $pythonExe = Install-Python $pythonDir $tempDir
-    Install-PythonPackages $pythonExe $venvDir $appDir $selectedRuntime
+    $pythonExe = Install-Python $pythonDir $tempDir $Portable.IsPresent
+    $null = Install-PythonPackages $pythonExe $venvDir $appDir $selectedRuntime $Portable.IsPresent
     Install-Ffmpeg $appDir $tempDir
-    $launcher = Write-Launcher $installRootPath $appDir $selectedRuntime
-    Create-Shortcuts $launcher $installRootPath
+    $launcher = Write-Launcher $installRootPath $selectedRuntime $Portable.IsPresent
+    if (-not $Portable) {
+        Create-Shortcuts $launcher $installRootPath
+    }
 
     Write-Step "Done"
-    Write-Host "Open Local SRT from the Desktop shortcut or the Start menu."
+    if ($Portable) {
+        Write-Host "Open Local SRT by running:"
+        Write-Host "  $launcher"
+    }
+    else {
+        Write-Host "Open Local SRT from the Desktop shortcut or the Start menu."
+    }
     Write-Host "The speech models will download the first time you transcribe a file."
 }
 finally {
-    if (Test-Path $tempDir) {
-        Remove-Item -Recurse -Force $tempDir
-    }
+    Remove-DirectoryBestEffort $tempDir
 }
