@@ -125,6 +125,10 @@ $payloadExpression;
             using (Process process = Process.Start(startInfo))
             {
                 process.WaitForExit();
+                if (process.ExitCode != 0)
+                {
+                    PauseForError();
+                }
                 return process.ExitCode;
             }
         }
@@ -132,6 +136,7 @@ $payloadExpression;
         {
             Console.Error.WriteLine("Local SRT setup failed:");
             Console.Error.WriteLine(ex.Message);
+            PauseForError();
             return 1;
         }
         finally
@@ -152,6 +157,16 @@ $payloadExpression;
     private static string Quote(string value)
     {
         return "\"" + value.Replace("\"", "\\\"") + "\"";
+    }
+
+    private static void PauseForError()
+    {
+        if (!Console.IsInputRedirected)
+        {
+            Console.WriteLine();
+            Console.WriteLine("Setup did not finish. Press any key to close this window.");
+            Console.ReadKey(true);
+        }
     }
 }
 "@

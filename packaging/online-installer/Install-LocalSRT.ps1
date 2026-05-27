@@ -97,7 +97,12 @@ function Install-Source($AppDir, $TempDir) {
         Download-File $SourceZipUrl $sourceZip
     }
     Expand-Archive -Force -Path $sourceZip -DestinationPath $expanded
-    $sourceRoot = Get-ChildItem -Path $expanded -Directory | Select-Object -First 1
+    $sourceRoot = Get-Item -LiteralPath $expanded
+    if (-not (Test-Path (Join-Path $sourceRoot.FullName "pyproject.toml"))) {
+        $sourceRoot = Get-ChildItem -Path $expanded -Directory |
+            Where-Object { Test-Path (Join-Path $_.FullName "pyproject.toml") } |
+            Select-Object -First 1
+    }
     if (-not $sourceRoot) {
         throw "Could not find Local SRT source files in the download."
     }
@@ -106,6 +111,9 @@ function Install-Source($AppDir, $TempDir) {
         Remove-Item -Recurse -Force $AppDir
     }
     New-Item -ItemType Directory -Force -Path $AppDir | Out-Null
+    if (-not (Test-Path (Join-Path $sourceRoot.FullName "src"))) {
+        throw "Local SRT source package is missing the src folder."
+    }
     Copy-Item -Recurse -Force (Join-Path $sourceRoot.FullName "src") (Join-Path $AppDir "src")
     Copy-Item -Force (Join-Path $sourceRoot.FullName "pyproject.toml") (Join-Path $AppDir "pyproject.toml")
     Copy-Item -Force (Join-Path $sourceRoot.FullName "README.md") (Join-Path $AppDir "README.md")
