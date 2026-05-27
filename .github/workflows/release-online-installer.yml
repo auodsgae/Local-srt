@@ -1,0 +1,31 @@
+name: Release online installer
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Build online installer zip
+        shell: pwsh
+        run: .\scripts\build_online_installer.ps1 -SourceRef $env:GITHUB_REF_NAME
+
+      - name: Create GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = (Select-String -Path "pyproject.toml" -Pattern '^version = "([^"]+)"$').Matches[0].Groups[1].Value
+          $zip = "release\LocalSRT-OnlineInstaller-v$version.zip"
+          gh release create $env:GITHUB_REF_NAME $zip `
+            --title "Local SRT $env:GITHUB_REF_NAME" `
+            --notes "Small online installer for Local SRT. The installer downloads Python, ffmpeg, the selected CPU or NVIDIA GPU runtime, and downloads speech models later on first transcription."

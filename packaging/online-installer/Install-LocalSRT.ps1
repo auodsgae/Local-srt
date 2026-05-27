@@ -10,7 +10,12 @@ $ErrorActionPreference = "Stop"
 
 $Repository = "auodsgae/Local-srt"
 $PythonVersion = "3.12.10"
-$SourceZipUrl = "https://github.com/$Repository/archive/refs/heads/$SourceRef.zip"
+if ($SourceRef -match "^v[0-9]") {
+    $SourceZipUrl = "https://github.com/$Repository/archive/refs/tags/$SourceRef.zip"
+}
+else {
+    $SourceZipUrl = "https://github.com/$Repository/archive/refs/heads/$SourceRef.zip"
+}
 $PythonInstallerUrl = "https://www.python.org/ftp/python/$PythonVersion/python-$PythonVersion-amd64.exe"
 $FfmpegZipUrl = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
 

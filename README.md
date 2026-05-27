@@ -64,3 +64,6 @@ For GitHub releases, use the online installer instead of uploading the full offl
 This creates `release\LocalSRT-OnlineInstaller-v0.1.0.zip`. The zip only contains setup scripts. When the user runs
 `Install-LocalSRT.cmd`, it downloads a private Python runtime, Local SRT, ffmpeg, and either the CPU or NVIDIA GPU speech
 runtime. Qwen speech models are still downloaded later on first transcription.
+
+For a tagged GitHub release, the workflow in `.github\workflows\release-online-installer.yml` builds this same small zip
+and attaches it to the release automatically.
