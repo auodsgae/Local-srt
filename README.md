@@ -16,7 +16,7 @@ Local SRT 是一個以 Windows 為優先的桌面應用程式，可以把音訊�
 ## 功能
 
 - 將常見音訊與影片檔轉換成 `.srt` 字幕。
-- v1 主要支援中文普通話與英文。
+- v1 主要支援中文與英文。
 - 預設輸出繁體中文。
 - 使用 Qwen3-ASR 與 Qwen3 ForcedAligner 進行語音辨識與時間軸對齊。
 - 每個轉錄工作會使用獨立 worker process，工作結束後可釋放 PyTorch/CUDA 記憶體。
