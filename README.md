@@ -28,11 +28,11 @@ Download the latest release from:
 
 <https://github.com/auodsgae/Local-srt/releases/latest>
 
-For most users, download `LocalSRT-OnlineInstaller-v0.1.1.zip`.
+For most users, download `LocalSRT-OnlineInstaller-v0.1.2.zip`.
 
 ### Portable Install
 
-1. Unzip `LocalSRT-OnlineInstaller-v0.1.1.zip` into the folder where you want Local SRT to live.
+1. Unzip `LocalSRT-OnlineInstaller-v0.1.2.zip` into the folder where you want Local SRT to live.
 2. Run `Install-LocalSRT-Portable.cmd`.
 3. Choose the runtime:
    - `1` for CPU, smaller and works on most Windows computers.
@@ -51,11 +51,11 @@ Run `Install-LocalSRT.cmd` from the release zip. This installs Local SRT under y
 
 <https://github.com/auodsgae/Local-srt/releases/latest>
 
-多數使用者請下載 `LocalSRT-OnlineInstaller-v0.1.1.zip`。
+多數使用者請下載 `LocalSRT-OnlineInstaller-v0.1.2.zip`。
 
 ### 可攜式安裝
 
-1. 將 `LocalSRT-OnlineInstaller-v0.1.1.zip` 解壓縮到你想放置 Local SRT 的資料夾。
+1. 將 `LocalSRT-OnlineInstaller-v0.1.2.zip` 解壓縮到你想放置 Local SRT 的資料夾。
 2. 執行 `Install-LocalSRT-Portable.cmd`。
 3. 選擇執行環境：
    - `1` 代表 CPU，下載較小，適用大多數 Windows 電腦。

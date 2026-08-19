@@ -27,10 +27,9 @@ class FakeBackend:
         self.calls += 1
         assert self.loaded
         return SimpleNamespace(
-            text="",
+            text="Hello.",
             alignment_items=[
                 SimpleAlignmentItem("Hello", 0.0, 0.2),
-                SimpleAlignmentItem(".", 0.2, 0.3),
             ],
         )
 
@@ -50,12 +49,16 @@ class PipelineTests(unittest.TestCase):
             FakeBackend.instances = []
             events = []
             with tempfile.TemporaryDirectory() as tmpdir:
+                output_path = Path(tmpdir) / "output.srt"
                 pipeline.transcribe_file(
                     Path(tmpdir) / "input.wav",
-                    Path(tmpdir) / "output.srt",
+                    output_path,
                     device="cpu",
                     progress=events.append,
                 )
+                content = output_path.read_text(encoding="utf-8")
+                self.assertEqual(content.count("Hello\n"), 2)
+                self.assertNotIn("Hello.", content)
             percents = [event["percent"] for event in events if event.get("type") == "progress"]
             self.assertEqual(percents[0], 1)
             self.assertEqual(percents[-1], 100)

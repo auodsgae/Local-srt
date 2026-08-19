@@ -67,7 +67,14 @@ def transcribe_file(
             }
         )
         if result.alignment_items and caption_style == "natural":
-            subtitles.extend(build_natural_captions(result.alignment_items, offset_seconds=offset, script=script))
+            subtitles.extend(
+                build_natural_captions(
+                    result.alignment_items,
+                    transcript_text=result.text,
+                    offset_seconds=offset,
+                    script=script,
+                )
+            )
         elif result.text.strip():
             subtitles.extend(_fallback_caption(result.text, offset, offset + len(chunk) / 16_000, script))
         emit(

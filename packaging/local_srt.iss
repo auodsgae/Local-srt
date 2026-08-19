@@ -1,5 +1,5 @@
 #define MyAppName "Local SRT"
-#define MyAppVersion "0.1.1"
+#define MyAppVersion "0.1.2"
 #define MyAppPublisher "Local SRT"
 #define MyAppExeName "LocalSRT.exe"
 

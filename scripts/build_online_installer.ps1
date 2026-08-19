@@ -31,6 +31,11 @@ if (Test-Path $zipPath) {
 New-Item -ItemType Directory -Force -Path $stageDir | Out-Null
 New-Item -ItemType Directory -Force -Path $payloadDir | Out-Null
 Copy-Item -Recurse -Force (Join-Path $root "src") (Join-Path $payloadDir "src")
+Get-ChildItem -Path $payloadDir -Recurse -Directory -Filter "__pycache__" |
+    Remove-Item -Recurse -Force
+Get-ChildItem -Path $payloadDir -Recurse -File |
+    Where-Object { $_.Extension -in @(".pyc", ".pyo") } |
+    Remove-Item -Force
 Copy-Item -Force (Join-Path $root "pyproject.toml") (Join-Path $payloadDir "pyproject.toml")
 Copy-Item -Force (Join-Path $root "README.md") (Join-Path $payloadDir "README.md")
 Compress-Archive -Path (Join-Path $payloadDir "*") -DestinationPath $payloadZip -CompressionLevel Optimal
