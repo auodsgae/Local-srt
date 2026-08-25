@@ -75,6 +75,8 @@ class QwenBackend:
             self._emit({"type": "status", "message": "Using CPU. This can be much slower than GPU mode."})
         os.environ.setdefault("HF_HOME", str(self.cache_dir / "huggingface"))
         os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
+        os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+        os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
 
         try:
             import torch

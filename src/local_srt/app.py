@@ -25,6 +25,10 @@ class Job:
     percent: int = 0
 
 
+def format_job_row(job: Job) -> str:
+    return f"{job.input_path.name} -> {job.output_path.name}    [{job.percent}% {job.status}]"
+
+
 def worker_command() -> list[str]:
     base = bundled_base_dir()
     exe = base / "subtitle-worker.exe"
@@ -75,6 +79,7 @@ def main() -> int:
             self.current_index = -1
             self.process: QtCore.QProcess | None = None
             self.stdout_buffer = ""
+            self.stderr_buffer = ""
 
             central = QtWidgets.QWidget()
             layout = QtWidgets.QVBoxLayout(central)
@@ -116,6 +121,7 @@ def main() -> int:
             controls.addStretch(1)
             self.progress = QtWidgets.QProgressBar()
             self.progress.setRange(0, 100)
+            self.progress.setValue(0)
             self.progress.setFixedWidth(220)
             controls.addWidget(self.progress)
             layout.addLayout(controls)
@@ -137,7 +143,7 @@ def main() -> int:
                 if path.is_file() and is_supported_file(path):
                     job = Job(input_path=path, output_path=path.with_suffix(".srt"))
                     self.jobs.append(job)
-                    self.list_widget.addItem(f"{path.name} -> {job.output_path.name}    [{job.status}]")
+                    self.list_widget.addItem(format_job_row(job))
                 elif path.is_file():
                     self.log.appendPlainText(f"Skipped unsupported file: {path}")
 
@@ -148,6 +154,7 @@ def main() -> int:
             self.jobs.clear()
             self.current_index = -1
             self.list_widget.clear()
+            self.progress.setRange(0, 100)
             self.progress.setValue(0)
             self.log.clear()
 
@@ -164,16 +171,21 @@ def main() -> int:
         def start_next_job(self) -> None:
             self.current_index += 1
             if self.current_index >= len(self.jobs):
-                self.log.appendPlainText("All jobs finished.")
+                self.log.appendPlainText("Queue finished.")
                 self.start_button.setEnabled(True)
                 self.add_button.setEnabled(True)
                 self.device_combo.setEnabled(True)
-                self.progress.setValue(100)
+                self.progress.setRange(0, 100)
+                last_job_completed = bool(
+                    self.jobs and self.jobs[-1].status.startswith("Done:")
+                )
+                self.progress.setValue(100 if last_job_completed else 0)
                 return
             job = self.jobs[self.current_index]
             job.status = "Starting"
             job.percent = 0
             self.refresh_job_row(self.current_index)
+            self.progress.setRange(0, 100)
             self.progress.setValue(0)
 
             args = worker_command() + [
@@ -193,8 +205,9 @@ def main() -> int:
                 "--caption-style",
                 "natural",
             ]
-            self.log.appendPlainText(f"Starting: {job.input_path}")
+            self.log.appendPlainText(f"Processing: {job.input_path.name}")
             self.stdout_buffer = ""
+            self.stderr_buffer = ""
             self.process = QtCore.QProcess(self)
             self.process.setProgram(args[0])
             self.process.setArguments(args[1:])
@@ -217,15 +230,13 @@ def main() -> int:
                 try:
                     event = json.loads(line)
                 except json.JSONDecodeError:
-                    self.log.appendPlainText(line)
                     continue
                 self.handle_event(event)
 
         def on_stderr(self) -> None:
             assert self.process is not None
             data = bytes(self.process.readAllStandardError()).decode("utf-8", errors="replace")
-            if data.strip():
-                self.log.appendPlainText(data.strip())
+            self.stderr_buffer = (self.stderr_buffer + data)[-16_384:]
 
         def handle_event(self, event: dict) -> None:
             if self.current_index < 0 or self.current_index >= len(self.jobs):
@@ -234,18 +245,25 @@ def main() -> int:
             event_type = event.get("type")
             if event_type == "status":
                 job.status = str(event.get("message", "Working"))
-                self.log.appendPlainText(job.status)
             elif event_type == "progress":
                 job.status = str(event.get("stage", "Working"))
-                job.percent = int(event.get("percent", 0))
-                self.progress.setValue(job.percent)
+                if event.get("mode") == "indeterminate":
+                    self.progress.setRange(0, 100)
+                    self.progress.setValue(job.percent)
+                else:
+                    job.percent = max(0, min(100, int(event.get("percent", 0))))
+                    self.progress.setRange(0, 100)
+                    self.progress.setValue(job.percent)
             elif event_type == "result":
                 job.status = f"Done: {event.get('srt_path')}"
                 job.percent = 100
+                self.progress.setRange(0, 100)
                 self.progress.setValue(100)
-                self.log.appendPlainText(job.status)
+                self.log.appendPlainText(f"Saved: {event.get('srt_path')}")
             elif event_type == "error":
                 job.status = "Failed"
+                self.progress.setRange(0, 100)
+                self.progress.setValue(job.percent)
                 self.log.appendPlainText(f"Error: {event.get('message')}")
             self.refresh_job_row(self.current_index)
 
@@ -254,20 +272,26 @@ def main() -> int:
                 try:
                     self.handle_event(json.loads(self.stdout_buffer))
                 except json.JSONDecodeError:
-                    self.log.appendPlainText(self.stdout_buffer.strip())
+                    pass
             self.stdout_buffer = ""
             if self.current_index >= 0 and self.current_index < len(self.jobs):
                 job = self.jobs[self.current_index]
                 if exit_code != 0 and job.status != "Failed":
                     job.status = f"Failed with exit code {exit_code}"
+                    self.progress.setRange(0, 100)
+                    self.progress.setValue(job.percent)
+                    stderr_lines = [line.strip() for line in self.stderr_buffer.splitlines() if line.strip()]
+                    if stderr_lines:
+                        self.log.appendPlainText(f"Worker error: {stderr_lines[-1]}")
                 self.refresh_job_row(self.current_index)
+            self.stderr_buffer = ""
             self.start_next_job()
 
         def refresh_job_row(self, index: int) -> None:
             job = self.jobs[index]
             item = self.list_widget.item(index)
             if item:
-                item.setText(f"{job.input_path.name} -> {job.output_path.name}    [{job.percent}% {job.status}]")
+                item.setText(format_job_row(job))
 
     app = QtWidgets.QApplication(sys.argv)
     app.setApplicationName("Local SRT")

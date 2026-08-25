@@ -128,6 +128,11 @@ def _is_punctuation_only(text: str) -> bool:
     return bool(text) and not any(_is_aligner_character(ch) for ch in text)
 
 
+def _has_spoken_content(text: str) -> bool:
+    text, _force_space = _clean_token(text)
+    return any(unicodedata.category(ch).startswith(("L", "N")) for ch in text)
+
+
 def _ends_with_punctuation(text: str, punctuation: set[str]) -> bool:
     text = text.rstrip()
     while text and text[-1] in TRAILING_CLOSERS:
@@ -259,9 +264,11 @@ def restore_transcript_formatting(
 @lru_cache(maxsize=4096)
 def _word_frequency(text: str, language: str) -> float:
     try:
+        import jieba
         from wordfreq import zipf_frequency
     except Exception:
         return 0.0
+    jieba.setLogLevel(40)
     return float(zipf_frequency(text, language))
 
 
@@ -337,6 +344,7 @@ def _jieba_boundary_inside_word(left_chars: str, right_chars: str) -> bool:
         import jieba
     except Exception:
         return False
+    jieba.setLogLevel(40)
     cursor = 0
     for segment in jieba.cut(context, HMM=True):
         next_cursor = cursor + len(segment)
@@ -412,17 +420,37 @@ def build_natural_captions(
     )
     subtitles: list[Subtitle] = []
     tokens: list[str] = []
-    start: float | None = None
-    end: float | None = None
+    token_starts: list[float] = []
+    token_ends: list[float] = []
+
+    def spoken_bounds(
+        caption_tokens: list[str], starts: list[float], ends: list[float]
+    ) -> tuple[float, float] | None:
+        spoken_indexes = [
+            index
+            for index, token in enumerate(caption_tokens)
+            if _has_spoken_content(token)
+        ]
+        if not spoken_indexes:
+            return None
+        return starts[spoken_indexes[0]], ends[spoken_indexes[-1]]
 
     def flush() -> None:
-        nonlocal tokens, start, end
+        nonlocal tokens, token_starts, token_ends
         text = _clean_caption_text(convert_chinese(_join_tokens(tokens), script))
-        if start is not None and end is not None and text:
-            subtitles.append(Subtitle(start + offset_seconds, end + offset_seconds, text))
+        bounds = spoken_bounds(tokens, token_starts, token_ends)
+        if bounds is not None and text:
+            caption_start, caption_end = bounds
+            subtitles.append(
+                Subtitle(
+                    caption_start + offset_seconds,
+                    caption_end + offset_seconds,
+                    text,
+                )
+            )
         tokens = []
-        start = None
-        end = None
+        token_starts = []
+        token_ends = []
 
     def last_clause_break_index() -> int | None:
         for token_index in range(len(tokens) - 2, -1, -1):
@@ -434,22 +462,32 @@ def build_natural_captions(
                 return token_index
         return None
 
-    def rebalance_at_clause(boundary_end: float) -> bool:
-        nonlocal tokens, start, end
+    def rebalance_at_clause() -> bool:
+        nonlocal tokens, token_starts, token_ends
         break_index = last_clause_break_index()
-        if break_index is None or start is None:
+        if break_index is None:
             return False
         prefix = tokens[: break_index + 1]
         remainder = tokens[break_index + 1 :]
+        prefix_starts = token_starts[: break_index + 1]
+        prefix_ends = token_ends[: break_index + 1]
+        remainder_starts = token_starts[break_index + 1 :]
+        remainder_ends = token_ends[break_index + 1 :]
         text = _clean_caption_text(convert_chinese(_join_tokens(prefix), script))
-        if not text or not remainder:
+        bounds = spoken_bounds(prefix, prefix_starts, prefix_ends)
+        if not text or not remainder or bounds is None:
             return False
+        caption_start, caption_end = bounds
         subtitles.append(
-            Subtitle(start + offset_seconds, boundary_end + offset_seconds, text)
+            Subtitle(
+                caption_start + offset_seconds,
+                caption_end + offset_seconds,
+                text,
+            )
         )
         tokens = remainder
-        start = boundary_end
-        end = boundary_end
+        token_starts = remainder_starts
+        token_ends = remainder_ends
         return True
 
     for index, item in enumerate(items):
@@ -468,16 +506,15 @@ def build_natural_captions(
             and _unsafe_boundary(candidate_tokens, str(next_item.text))
             and not _unsafe_boundary(tokens, text)
         ):
-            if not rebalance_at_clause(float(item.start_time)):
+            if not rebalance_at_clause():
                 flush()
 
         if tokens and _would_exceed_limit(tokens, text, max_words, max_zh_chars) and not _unsafe_boundary(tokens, text):
             flush()
 
-        if start is None:
-            start = float(item.start_time)
-        end = float(item.end_time)
         tokens.append(text)
+        token_starts.append(float(item.start_time))
+        token_ends.append(float(item.end_time))
 
         next_gap = (
             max(0.0, float(next_item.start_time) - float(item.end_time))
@@ -494,7 +531,7 @@ def build_natural_captions(
         )
         text_has_clause_punct = _ends_with_punctuation(caption_text, CLAUSE_PUNCT)
 
-        if over_soft_limit and not text_has_sentence_end and rebalance_at_clause(float(item.end_time)):
+        if over_soft_limit and not text_has_sentence_end and rebalance_at_clause():
             continue
 
         should_flush = (

@@ -5,12 +5,32 @@ from pathlib import Path
 from typing import Callable
 
 from .captions import SimpleAlignmentItem, build_natural_captions, convert_chinese
-from .config import MAX_ALIGN_CHUNK_SECONDS
+from .config import MAX_ALIGN_CHUNK_SECONDS, SAMPLE_RATE
 from .media import chunk_audio, decode_to_pcm16k
 from .qwen_backend import QwenBackend
 from .srt import Subtitle, write_srt
 
 ProgressCallback = Callable[[dict], None]
+
+
+def _emit_progress(
+    emit: ProgressCallback,
+    input_path: Path,
+    stage: str,
+    *,
+    percent: int | None = None,
+    **details: object,
+) -> None:
+    event: dict[str, object] = {
+        "type": "progress",
+        "file": str(input_path),
+        "mode": "indeterminate" if percent is None else "determinate",
+        "stage": stage,
+        **details,
+    }
+    if percent is not None:
+        event["percent"] = max(0, min(100, percent))
+    emit(event)
 
 
 def _fallback_caption(text: str, start: float, end: float, script: str) -> list[Subtitle]:
@@ -32,40 +52,41 @@ def transcribe_file(
     emit = progress or (lambda _event: None)
     started = time.perf_counter()
     emit({"type": "status", "message": "Decoding media with ffmpeg"})
-    emit({"type": "progress", "file": str(input_path), "percent": 1, "stage": "decoding media"})
+    _emit_progress(emit, input_path, "decoding media")
     audio, duration = decode_to_pcm16k(input_path)
-    emit({"type": "progress", "file": str(input_path), "percent": 4, "stage": "preparing audio chunks"})
+    _emit_progress(emit, input_path, "preparing audio chunks")
     chunks = chunk_audio(audio, MAX_ALIGN_CHUNK_SECONDS)
     if not chunks:
         raise RuntimeError("No audio samples were decoded from the input file.")
 
     backend = QwenBackend(model_size=model_size, device=device, progress=emit)
-    emit({"type": "progress", "file": str(input_path), "percent": 8, "stage": "loading transcription model"})
+    _emit_progress(emit, input_path, "loading transcription model")
     backend.load()
-    emit({"type": "progress", "file": str(input_path), "percent": 15, "stage": "model ready"})
 
     subtitles: list[Subtitle] = []
+    completed_samples = 0
+    total_samples = len(audio)
     for index, (offset, chunk) in enumerate(chunks, 1):
-        chunk_start = 15 + int(((index - 1) / len(chunks)) * 80)
-        chunk_mid = 15 + int(((index - 0.45) / len(chunks)) * 80)
-        chunk_done = 15 + int((index / len(chunks)) * 80)
-        emit(
-            {
-                "type": "progress",
-                "file": str(input_path),
-                "percent": chunk_start,
-                "stage": f"transcribing chunk {index}/{len(chunks)}",
-            }
-        )
+        completed_percent = min(100, int((completed_samples / total_samples) * 100))
+        if len(chunks) == 1:
+            _emit_progress(emit, input_path, "transcribing audio")
+        else:
+            _emit_progress(
+                emit,
+                input_path,
+                f"transcribing chunk {index}/{len(chunks)}",
+                percent=completed_percent,
+            )
         result = backend.transcribe_chunk(chunk, language=language)
-        emit(
-            {
-                "type": "progress",
-                "file": str(input_path),
-                "percent": min(94, chunk_mid),
-                "stage": f"building captions for chunk {index}/{len(chunks)}",
-            }
-        )
+        if len(chunks) == 1:
+            _emit_progress(emit, input_path, "building captions")
+        else:
+            _emit_progress(
+                emit,
+                input_path,
+                f"building captions for chunk {index}/{len(chunks)}",
+                percent=completed_percent,
+            )
         if result.alignment_items and caption_style == "natural":
             subtitles.extend(
                 build_natural_captions(
@@ -76,22 +97,24 @@ def transcribe_file(
                 )
             )
         elif result.text.strip():
-            subtitles.extend(_fallback_caption(result.text, offset, offset + len(chunk) / 16_000, script))
-        emit(
-            {
-                "type": "progress",
-                "file": str(input_path),
-                "percent": min(95, chunk_done),
-                "stage": f"finished chunk {index}/{len(chunks)}",
-            }
+            subtitles.extend(_fallback_caption(result.text, offset, offset + len(chunk) / SAMPLE_RATE, script))
+        completed_samples += len(chunk)
+        completed_percent = min(100, int((completed_samples / total_samples) * 100))
+        _emit_progress(
+            emit,
+            input_path,
+            f"processed chunk {index}/{len(chunks)}",
+            percent=completed_percent,
+            completed_audio_seconds=completed_samples / SAMPLE_RATE,
+            total_audio_seconds=total_samples / SAMPLE_RATE,
         )
 
     if not subtitles:
         raise RuntimeError("No speech text was detected.")
 
-    emit({"type": "progress", "file": str(input_path), "percent": 98, "stage": "writing SRT"})
+    _emit_progress(emit, input_path, "writing SRT", percent=100)
     write_srt(output_path, subtitles)
-    emit({"type": "progress", "file": str(input_path), "percent": 100, "stage": "done"})
+    _emit_progress(emit, input_path, "done", percent=100)
     return output_path, time.perf_counter() - started
 
 

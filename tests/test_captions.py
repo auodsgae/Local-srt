@@ -195,7 +195,7 @@ class CaptionTests(unittest.TestCase):
         )
         self.assertEqual(len(subtitles), 2)
         self.assertEqual(subtitles[0].text, "\u4f60\u597d")
-        self.assertAlmostEqual(subtitles[0].end, 0.36)
+        self.assertAlmostEqual(subtitles[0].end, 0.35)
         self.assertAlmostEqual(subtitles[1].start, 2.00)
 
     def test_caption_never_starts_with_punctuation(self):
@@ -215,7 +215,7 @@ class CaptionTests(unittest.TestCase):
         self.assertEqual([item.text for item in subtitles], ["\u4f46\u662f\u9019\u662f\u4e0b\u4e00\u53e5"])
         self.assertTrue(all(item.text[0].isalnum() for item in subtitles))
 
-    def test_kingshot_opening_rebalances_at_comma_without_changing_time_blocks(self):
+    def test_kingshot_opening_rebalances_at_comma_using_spoken_word_times(self):
         characters = (
             "\u73a9\u624b\u904a\u6700\u6015\u5ee3\u544a\u5f48\u51fa\u4f86"
             "\u4f46\u9019\u6b3e\u904a\u6232\u8ddf\u6211\u8aaa\u4e0d\u7528\u6015"
@@ -241,10 +241,23 @@ class CaptionTests(unittest.TestCase):
         self.assertEqual(
             [(item.start, item.end, item.text) for item in subtitles],
             [
-                (0.00, 2.08, "\u73a9\u624b\u904a\u6700\u6015\u5ee3\u544a\u5f48\u51fa\u4f86"),
-                (2.08, 2.80, "\u4f46\u9019\u6b3e\u904a\u6232\u8ddf\u6211\u8aaa\u4e0d\u7528\u6015"),
+                (0.00, 1.60, "\u73a9\u624b\u904a\u6700\u6015\u5ee3\u544a\u5f48\u51fa\u4f86"),
+                (1.76, 2.80, "\u4f46\u9019\u6b3e\u904a\u6232\u8ddf\u6211\u8aaa\u4e0d\u7528\u6015"),
             ],
         )
+
+    def test_punctuation_only_items_do_not_change_caption_bounds(self):
+        subtitles = transcript_to_subtitles_for_tests(
+            [
+                ("\uff0c", 0.20, 0.20),
+                ("\u4f60", 0.50, 0.60),
+                ("\u597d", 0.60, 0.75),
+                ("\u3002", 0.75, 0.75),
+            ]
+        )
+        self.assertEqual(len(subtitles), 1)
+        self.assertAlmostEqual(subtitles[0].start, 0.50)
+        self.assertAlmostEqual(subtitles[0].end, 0.75)
 
     def test_mandarin_splits_near_fifteen_characters_without_breaking_common_words(self):
         phrase = "\u6211\u5011\u4eca\u5929\u4e00\u8d77\u53bb\u53f0\u5317\u8eca\u7ad9\u9644\u8fd1\u5403\u665a\u9910"
