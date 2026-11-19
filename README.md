@@ -64,14 +64,12 @@ Run `Install-LocalSRT.cmd` from the release zip. This installs Local SRT under y
 
 ## Important Notes
 
-- Python, PyTorch, ffmpeg, and speech models are not bundled in the GitHub release asset.
 - The installer downloads the required runtime files during setup.
 - Qwen speech models download later during first transcription.
 - The NVIDIA GPU option requires a compatible NVIDIA GPU and driver.
 
 ## 重要注意事項
 
-- GitHub Release 不內建 Python、PyTorch、ffmpeg 與語音模型。
 - 安裝程式會在設定過程中下載必要的執行環境。
 - Qwen 語音模型會在第一次轉錄時再下載。
 - NVIDIA GPU 選項需要相容的 NVIDIA GPU 與驅動程式。
