@@ -36,21 +36,13 @@ Get-ChildItem -Path $payloadDir -Recurse -File |
     Remove-Item -Force
 Copy-Item -Force (Join-Path $root "pyproject.toml") (Join-Path $payloadDir "pyproject.toml")
 Copy-Item -Force (Join-Path $root "README.md") (Join-Path $payloadDir "README.md")
+& (Join-Path $PSScriptRoot "build_mygo_windows.ps1") -Output (Join-Path $payloadDir "LocalSRT-MyGO.exe")
 Compress-Archive -Path (Join-Path $payloadDir "*") -DestinationPath $payloadZip -CompressionLevel Optimal
 
 Copy-Item -Force (Join-Path $root "packaging\online-installer\Install-LocalSRT.ps1") $installerScript
 $installerText = Get-Content -Raw -Path $installerScript
 $installerText = $installerText.Replace('[string]$SourceRef = "main"', "[string]`$SourceRef = `"$SourceRef`"")
 Set-Content -Encoding ASCII -Path $installerScript -Value $installerText
-
-function Convert-ToCSharpStringExpression($Path) {
-    $base64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($Path))
-    $parts = [regex]::Matches($base64, ".{1,100}") | ForEach-Object { $_.Value }
-    return (($parts | ForEach-Object { '            "' + $_ + '"' }) -join " +`r`n")
-}
-
-$scriptExpression = Convert-ToCSharpStringExpression $installerScript
-$payloadExpression = Convert-ToCSharpStringExpression $payloadZip
 
 $csharp = @"
 using System;
@@ -61,12 +53,6 @@ using System.IO;
 internal static class LocalSrtInstaller
 {
     private const string Version = "$version";
-
-    private static readonly string InstallerScriptBase64 =
-$scriptExpression;
-
-    private static readonly string PayloadZipBase64 =
-$payloadExpression;
 
     [STAThread]
     private static int Main(string[] args)
@@ -89,8 +75,8 @@ $payloadExpression;
 
         try
         {
-            File.WriteAllBytes(scriptPath, Convert.FromBase64String(InstallerScriptBase64));
-            File.WriteAllBytes(payloadPath, Convert.FromBase64String(PayloadZipBase64));
+            ExtractResource("Install-LocalSRT.ps1", scriptPath);
+            ExtractResource("LocalSRT-source.zip", payloadPath);
 
             var psArgs = new List<string>
             {
@@ -164,6 +150,17 @@ $payloadExpression;
         return "\"" + value.Replace("\"", "\\\"") + "\"";
     }
 
+    private static void ExtractResource(string name, string path)
+    {
+        using (Stream source = typeof(LocalSrtInstaller).Assembly.GetManifestResourceStream(name))
+        using (FileStream destination = File.Create(path))
+        {
+            if (source == null)
+                throw new InvalidOperationException("Installer resource missing: " + name);
+            source.CopyTo(destination);
+        }
+    }
+
     private static void PauseForError()
     {
         if (!Console.IsInputRedirected)
@@ -187,7 +184,7 @@ if (-not $csc) {
     throw "Could not find the Windows C# compiler."
 }
 
-& $csc /nologo /target:exe /platform:x64 "/out:$exePath" $sourcePath
+& $csc /nologo /target:exe /platform:x64 "/out:$exePath" "/resource:$installerScript,Install-LocalSRT.ps1" "/resource:$payloadZip,LocalSRT-source.zip" $sourcePath
 if ($LASTEXITCODE -ne 0) {
     throw "Could not build installer exe."
 }

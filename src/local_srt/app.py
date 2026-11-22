@@ -13,7 +13,7 @@ def _import_qt():
     try:
         from PySide6 import QtCore, QtGui, QtWidgets
     except Exception as exc:
-        raise RuntimeError("PySide6 is required for the desktop app. Install with pip install -e .") from exc
+        raise RuntimeError('PySide6 is required for the legacy Qt app. Install with pip install -e ".[qt]".') from exc
     return QtCore, QtGui, QtWidgets
 
 

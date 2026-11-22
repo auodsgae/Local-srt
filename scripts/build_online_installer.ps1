@@ -38,6 +38,7 @@ Get-ChildItem -Path $payloadDir -Recurse -File |
     Remove-Item -Force
 Copy-Item -Force (Join-Path $root "pyproject.toml") (Join-Path $payloadDir "pyproject.toml")
 Copy-Item -Force (Join-Path $root "README.md") (Join-Path $payloadDir "README.md")
+& (Join-Path $PSScriptRoot "build_mygo_windows.ps1") -Output (Join-Path $payloadDir "LocalSRT-MyGO.exe")
 Compress-Archive -Path (Join-Path $payloadDir "*") -DestinationPath $payloadZip -CompressionLevel Optimal
 Remove-Item -Recurse -Force (Split-Path -Parent $payloadDir)
 

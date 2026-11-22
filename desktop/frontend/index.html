@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; base-uri 'none'; form-action 'none'">
+  <title>Local SRT</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <main>
+    <header class="masthead">
+      <h1>Local SRT</h1>
+      <p>Turn audio and video into subtitles on this device.</p>
+    </header>
+
+    <section id="drop" class="drop" aria-labelledby="drop-title">
+      <div>
+        <h2 id="drop-title">Drop audio or video here</h2>
+        <p>SRT files are saved next to the originals.</p>
+      </div>
+      <button id="pick" type="button" disabled>Add files</button>
+    </section>
+
+    <section class="queue" aria-labelledby="queue-title">
+      <div class="queue-heading">
+        <h2 id="queue-title">Queue <span id="count"></span></h2>
+        <button id="clear" type="button" disabled>Clear queue</button>
+      </div>
+      <p id="empty">No files added yet.</p>
+      <ul id="jobs" aria-label="Files in queue"></ul>
+    </section>
+
+    <footer>
+      <section class="progress-panel" aria-label="Transcription progress">
+        <div class="progress-label">
+          <label for="progress" id="stage" role="status">Ready</label>
+          <span id="percent">0%</span>
+        </div>
+        <progress id="progress" value="0" max="100"></progress>
+        <p id="notice" role="status" hidden></p>
+      </section>
+      <div class="actions">
+        <label for="device">Device</label>
+        <select id="device" disabled>
+          <option value="cuda">NVIDIA GPU</option>
+          <option value="cpu">CPU</option>
+        </select>
+        <button id="start" class="primary" type="button" disabled>Transcribe</button>
+      </div>
+    </footer>
+  </main>
+</body>
+</html>

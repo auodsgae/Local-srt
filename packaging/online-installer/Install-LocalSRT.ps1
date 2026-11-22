@@ -278,6 +278,11 @@ function Install-Source($AppDir, $TempDir) {
     if (-not $sourceRoot) {
         throw "Could not find Local SRT source files in the download."
     }
+    $desktopExe = Join-Path $sourceRoot.FullName "LocalSRT-MyGO.exe"
+    if (-not (Test-Path -LiteralPath $desktopExe -PathType Leaf)) {
+        throw "The app executable is missing. Download the complete Windows installer from GitHub Releases."
+    }
+    Copy-Item -LiteralPath $desktopExe -Destination (Join-Path $TempDir "LocalSRT-MyGO.exe") -Force
 
     if (Test-Path $AppDir) {
         $existingFfmpegDir = Join-Path $AppDir "ffmpeg"
@@ -360,15 +365,40 @@ function Install-PythonPackages($PythonExe, $VenvDir, $AppDir, $SelectedRuntime,
     return $runtimePython
 }
 
+function Test-WebView2 {
+    $client = "{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
+    foreach ($key in @(
+        "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\$client",
+        "HKCU:\Software\Microsoft\EdgeUpdate\Clients\$client"
+    )) {
+        $entry = Get-ItemProperty -LiteralPath $key -Name pv -ErrorAction SilentlyContinue
+        if ($entry.pv -and $entry.pv -ne "0.0.0.0") {
+            return $true
+        }
+    }
+    return $false
+}
+
+function Install-WebView2($TempDir) {
+    if (Test-WebView2) {
+        return
+    }
+    Write-Step "Installing Microsoft Edge WebView2"
+    $bootstrapper = Join-Path $TempDir "MicrosoftEdgeWebview2Setup.exe"
+    Download-File "https://go.microsoft.com/fwlink/p/?LinkId=2124703" $bootstrapper
+    Run-ProcessCommand $bootstrapper @("/silent", "/install")
+    if (-not (Test-WebView2)) {
+        throw "Microsoft Edge WebView2 setup did not register the runtime."
+    }
+}
+
 function Write-Launcher($InstallRoot, $SelectedRuntime, [bool]$UsePortableRuntime) {
     Write-Step "Creating launcher"
     $launcher = Join-Path $InstallRoot "LocalSRT.cmd"
     if ($UsePortableRuntime) {
-        $pythonw = "%LOCAL_SRT_ROOT%python\pythonw.exe"
         $appDataLine = 'set "LOCAL_SRT_APP_DATA=%LOCAL_SRT_ROOT%data"'
     }
     else {
-        $pythonw = "%LOCAL_SRT_ROOT%.venv\Scripts\pythonw.exe"
         $appDataLine = ""
     }
     $launcherText = @"
@@ -377,7 +407,7 @@ set "LOCAL_SRT_ROOT=%~dp0"
 set "PATH=%LOCAL_SRT_ROOT%app\ffmpeg;%PATH%"
 set "LOCAL_SRT_DEFAULT_DEVICE=$SelectedRuntime"
 $appDataLine
-start "Local SRT" "$pythonw" -m local_srt
+start "Local SRT" "%LOCAL_SRT_ROOT%LocalSRT-MyGO.exe"
 "@
     Set-Content -Encoding ASCII -Path $launcher -Value $launcherText
     return $launcher
@@ -458,6 +488,8 @@ try {
     $pythonExe = Install-Python $pythonDir $tempDir $Portable.IsPresent
     $null = Install-PythonPackages $pythonExe $venvDir $appDir $selectedRuntime $Portable.IsPresent
     Install-Ffmpeg $appDir $tempDir
+    Install-WebView2 $tempDir
+    Copy-Item -LiteralPath (Join-Path $tempDir "LocalSRT-MyGO.exe") -Destination $installRootPath -Force
     $launcher = Write-Launcher $installRootPath $selectedRuntime $Portable.IsPresent
     if (-not $Portable) {
         Create-Shortcuts $launcher $installRootPath

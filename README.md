@@ -1,8 +1,8 @@
 # Local SRT
 
-Local SRT is a Windows desktop app that turns audio and video files into `.srt` subtitle files. It runs speech recognition locally after the required runtime and model files have been downloaded.
+Local SRT is a desktop app for Windows and macOS built with MyGO. It turns audio and video files into `.srt` subtitles on your device after downloading the runtime and speech models.
 
-Local SRT 是一個Windows系統的桌面應用程式，可以把音訊和影片檔轉成 `.srt` 字幕檔。下載必要的執行環境與模型後，語音辨識會在本機執行。
+Local SRT 是一個使用 MyGO 開發的 Windows 和 macOS 桌面應用程式，可以把音訊和影片檔轉成 `.srt` 字幕檔。下載執行環境與模型後，語音辨識會在本機執行。
 
 ## Features
 
@@ -22,11 +22,11 @@ Download the latest release from:
 
 <https://github.com/auodsgae/Local-srt/releases/latest>
 
-For most users, download `LocalSRT-OnlineInstaller-v0.1.3.zip`.
+On Windows x64, run `LocalSRT-Setup-v0.2.0.exe`. On macOS 14 or later with Apple Silicon, open `LocalSRT-v0.2.0-macOS-arm64.dmg` and drag Local SRT into Applications. The Mac app downloads its runtime on the first transcription and uses the CPU. The Mac build is ad hoc signed and has no Apple notarization.
 
 ### Portable Install
 
-1. Unzip `LocalSRT-OnlineInstaller-v0.1.3.zip` into the folder where you want Local SRT to live.
+1. Unzip `LocalSRT-OnlineInstaller-v0.2.0.zip` into the folder where you want Local SRT to live.
 2. Run `Install-LocalSRT-Portable.cmd`.
 3. Choose the runtime:
    - `1` for CPU, smaller and works on most Windows computers.
@@ -45,11 +45,11 @@ Run `Install-LocalSRT.cmd` from the release zip. This installs Local SRT under y
 
 <https://github.com/auodsgae/Local-srt/releases/latest>
 
-多數使用者請下載 `LocalSRT-OnlineInstaller-v0.1.3.zip`。
+Windows x64 請執行 `LocalSRT-Setup-v0.2.0.exe`。Apple Silicon Mac（macOS 14 以上）請開啟 `LocalSRT-v0.2.0-macOS-arm64.dmg`，並將 Local SRT 拖入「應用程式」。Mac 版使用 CPU，第一次轉錄時會下載執行環境。Mac 版採用 ad hoc 簽章，未經 Apple 公證。
 
 ### 可攜式安裝
 
-1. 將 `LocalSRT-OnlineInstaller-v0.1.3.zip` 解壓縮到你想放置 Local SRT 的資料夾。
+1. 將 `LocalSRT-OnlineInstaller-v0.2.0.zip` 解壓縮到你想放置 Local SRT 的資料夾。
 2. 執行 `Install-LocalSRT-Portable.cmd`。
 3. 選擇執行環境：
    - `1` 代表 CPU，下載較小，適用大多數 Windows 電腦。
@@ -64,12 +64,21 @@ Run `Install-LocalSRT.cmd` from the release zip. This installs Local SRT under y
 
 ## Important Notes
 
-- The installer downloads the required runtime files during setup.
+- The Windows installer downloads the required runtime files during setup.
 - Qwen speech models download later during first transcription.
 - The NVIDIA GPU option requires a compatible NVIDIA GPU and driver.
 
 ## 重要注意事項
 
-- 安裝程式會在設定過程中下載必要的執行環境。
+- Windows 安裝程式會在設定過程中下載必要的執行環境。
 - Qwen 語音模型會在第一次轉錄時再下載。
 - NVIDIA GPU 選項需要相容的 NVIDIA GPU 與驅動程式。
+
+## Build installers
+
+Both builds require Go 1.27.3 or newer. Run these commands from the repository root.
+
+- Windows x64 (PowerShell 7): `./scripts/build_installer_exe.ps1` and `./scripts/build_online_installer.ps1`.
+- Apple Silicon Mac (with `uv` on PATH): `bash scripts/build_macos_installer.sh`.
+
+The installers are written to `release/`. Pushing a version tag builds and publishes both platforms through GitHub Actions. For desktop development, set `LOCAL_SRT_PYTHON` to an absolute path to Python with the Local SRT package installed.

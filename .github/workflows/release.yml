@@ -1,0 +1,106 @@
+name: Release Local SRT
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: desktop/go.mod
+          cache-dependency-path: desktop/go.sum
+      - name: Test desktop app
+        working-directory: desktop
+        run: go test ./...
+
+      - name: Build online installer zip
+        shell: pwsh
+        run: .\scripts\build_online_installer.ps1 -SourceRef $env:GITHUB_REF_NAME
+
+      - name: Build setup executable
+        shell: pwsh
+        run: .\scripts\build_installer_exe.ps1 -SourceRef $env:GITHUB_REF_NAME
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installers
+          path: |
+            release/LocalSRT-Setup-*.exe
+            release/LocalSRT-OnlineInstaller-*.zip
+          if-no-files-found: error
+
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: desktop/go.mod
+          cache-dependency-path: desktop/go.sum
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: '0.13.9'
+      - name: Test desktop app
+        working-directory: desktop
+        run: go test ./...
+      - name: Build and verify disk image
+        run: |
+          bash scripts/build_macos_installer.sh
+          hdiutil verify release/*.dmg
+      - name: Smoke-test packaged transcription runtime
+        timeout-minutes: 15
+        run: |
+          work="$(mktemp -d)"
+          mkdir "$work/mount"
+          hdiutil attach release/*.dmg -readonly -nobrowse -mountpoint "$work/mount"
+          trap 'hdiutil detach "$work/mount"' EXIT
+          app="$work/mount/Local SRT.app"
+          codesign --verify --deep --strict "$app"
+          resources="$app/Contents/Resources"
+          version="${GITHUB_REF_NAME#v}"
+          /bin/sh "$resources/prepare-worker.sh" "$work/data" "$version"
+          say -r 160 -o "$work/speech.aiff" 'This is a subtitle test.'
+          LOCAL_SRT_APP_DATA="$work/data" "$work/data/runtime/$version/bin/python3" -m local_srt.worker transcribe --input "$work/speech.aiff" --output "$work/speech.srt" --device cpu --model 0.6b --language English
+          test -s "$work/speech.srt"
+          grep -i 'subtitle' "$work/speech.srt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-installer
+          path: release/*.dmg
+          if-no-files-found: error
+
+  publish:
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: installers
+          merge-multiple: true
+      - name: Publish installers to GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$GITHUB_REF_NAME"
+          gh release create "$version" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            "installers/LocalSRT-Setup-$version.exe" \
+            "installers/LocalSRT-OnlineInstaller-$version.zip" \
+            "installers/LocalSRT-$version-macOS-arm64.dmg" \
+            --title "Local SRT $version" --notes-file - <<'NOTES'
+          Local SRT now opens the MyGO desktop interface with a neutral dark theme.
+
+          - **Windows x64:** Run the setup EXE, or use the ZIP for portable setup. Choose CPU or NVIDIA CUDA during installation.
+          - **macOS 14+ on Apple Silicon:** Open the DMG and drag Local SRT to Applications. First transcription downloads the Python runtime, ffmpeg, and the Qwen speech models. This build uses the CPU and is ad hoc signed, without Apple notarization.
+
+          Transcription runs locally after the downloads. Existing SRT files are preserved by saving a numbered copy.
+          NOTES

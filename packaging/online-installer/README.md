@@ -8,10 +8,11 @@ For a portable install, unzip this folder where you want Local SRT to live, then
 
 For a normal per-user install, run `Install-LocalSRT.cmd`.
 
-This package includes a small copy of the Local SRT source. The portable installer downloads:
+This package includes the MyGO desktop app and the Local SRT worker source. The portable installer downloads:
 
 - an embeddable Python runtime
 - only the selected PyTorch runtime, CPU or NVIDIA GPU
 - ffmpeg
+- Microsoft Edge WebView2, if it is missing
 
 The speech models are not included in the release package. They download later when the app transcribes for the first time.

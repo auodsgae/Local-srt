@@ -23,13 +23,20 @@ def find_ffmpeg() -> Path | None:
     local = bundled_base_dir() / "ffmpeg" / ("ffmpeg.exe" if sys.platform == "win32" else "ffmpeg")
     if local.exists():
         return local
+    if sys.platform == "darwin":
+        try:
+            from imageio_ffmpeg import get_ffmpeg_exe
+
+            return Path(get_ffmpeg_exe())
+        except (ImportError, RuntimeError):
+            return None
     return None
 
 
 def decode_to_pcm16k(input_path: Path, ffmpeg_path: Path | None = None) -> tuple[np.ndarray, float]:
     ffmpeg = ffmpeg_path or find_ffmpeg()
     if not ffmpeg:
-        raise MediaError("ffmpeg was not found. Install ffmpeg or place ffmpeg.exe in the app ffmpeg folder.")
+        raise MediaError("ffmpeg was not found. Run the Local SRT installer or install ffmpeg on your PATH.")
     if not input_path.exists():
         raise MediaError(f"Input file does not exist: {input_path}")
 
