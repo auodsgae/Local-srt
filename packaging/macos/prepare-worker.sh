@@ -10,6 +10,6 @@ export UV_PYTHON_INSTALL_DIR="$data/python"
 export UV_NO_PROGRESS=1
 
 "$resources/uv" --no-config venv --managed-python --allow-existing --python 3.12 "$venv"
-"$resources/uv" --no-config pip install --no-cache --python "$venv/bin/python3" "$resources/worker"
+"$resources/uv" --no-config pip install --no-cache --python "$venv/bin/python3" "$resources/local_srt-$version-py3-none-any.whl"
 "$venv/bin/python3" -c 'from qwen_asr import Qwen3ASRModel; from local_srt.media import find_ffmpeg; assert find_ffmpeg() is not None'
 touch "$venv/.worker-ready"

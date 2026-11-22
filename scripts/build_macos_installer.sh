@@ -9,11 +9,13 @@ if [[ "$(uname -s)" != Darwin || "$(uname -m)" != arm64 || -z "$version" ]]; the
 fi
 
 out="$root/release"
-stage=$(mktemp -d "${TMPDIR:-/tmp}/localsrt-macos.XXXXXXXX")
-trap 'rm -r "$stage"' EXIT
+scratch=$(mktemp -d "${TMPDIR:-/tmp}/localsrt-macos.XXXXXXXX")
+trap 'rm -r "$scratch"' EXIT
+stage="$scratch/image"
+worker="$scratch/worker"
 app="$stage/Local SRT.app"
 resources="$app/Contents/Resources"
-mkdir -p "$out" "$app/Contents/MacOS" "$resources/worker/src"
+mkdir -p "$out" "$app/Contents/MacOS" "$resources" "$worker"
 (
     cd "$root/desktop"
     CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags "-X main.appVersion=$version" -o "$app/Contents/MacOS/LocalSRT" .
@@ -24,12 +26,13 @@ for license in LICENSE-MIT LICENSE-APACHE; do
     curl -fLsS --retry 2 "https://raw.githubusercontent.com/astral-sh/uv/$uv_version/$license" -o "$resources/uv-$license"
 done
 install -m 644 "$root/packaging/macos/prepare-worker.sh" "$resources/prepare-worker.sh"
-cp "$root/pyproject.toml" "$root/README.md" "$resources/worker/"
+cp "$root/pyproject.toml" "$root/README.md" "$worker/"
 git -C "$root" ls-files -z src/local_srt | while IFS= read -r -d '' relative; do
-    target="$resources/worker/$relative"
+    target="$worker/$relative"
     mkdir -p "$(dirname "$target")"
     install -m 644 "$root/$relative" "$target"
 done
+uv --no-config build --wheel --python 3.12 --out-dir "$resources" "$worker"
 cat > "$app/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

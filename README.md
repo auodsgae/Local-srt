@@ -22,11 +22,11 @@ Download the latest release from:
 
 <https://github.com/auodsgae/Local-srt/releases/latest>
 
-On Windows x64, run `LocalSRT-Setup-v0.2.0.exe`. On macOS 14 or later with Apple Silicon, open `LocalSRT-v0.2.0-macOS-arm64.dmg` and drag Local SRT into Applications. The Mac app downloads its runtime on the first transcription and uses the CPU. The Mac build is ad hoc signed and has no Apple notarization.
+On Windows x64, run `LocalSRT-Setup-v0.2.1.exe`. On macOS 14 or later with Apple Silicon, open `LocalSRT-v0.2.1-macOS-arm64.dmg` and drag Local SRT into Applications. The Mac app downloads its runtime on the first transcription and uses the CPU. The Mac build is ad hoc signed and has no Apple notarization.
 
 ### Portable Install
 
-1. Unzip `LocalSRT-OnlineInstaller-v0.2.0.zip` into the folder where you want Local SRT to live.
+1. Unzip `LocalSRT-OnlineInstaller-v0.2.1.zip` into the folder where you want Local SRT to live.
 2. Run `Install-LocalSRT-Portable.cmd`.
 3. Choose the runtime:
    - `1` for CPU, smaller and works on most Windows computers.
@@ -45,11 +45,11 @@ Run `Install-LocalSRT.cmd` from the release zip. This installs Local SRT under y
 
 <https://github.com/auodsgae/Local-srt/releases/latest>
 
-Windows x64 請執行 `LocalSRT-Setup-v0.2.0.exe`。Apple Silicon Mac（macOS 14 以上）請開啟 `LocalSRT-v0.2.0-macOS-arm64.dmg`，並將 Local SRT 拖入「應用程式」。Mac 版使用 CPU，第一次轉錄時會下載執行環境。Mac 版採用 ad hoc 簽章，未經 Apple 公證。
+Windows x64 請執行 `LocalSRT-Setup-v0.2.1.exe`。Apple Silicon Mac（macOS 14 以上）請開啟 `LocalSRT-v0.2.1-macOS-arm64.dmg`，並將 Local SRT 拖入「應用程式」。Mac 版使用 CPU，第一次轉錄時會下載執行環境。Mac 版採用 ad hoc 簽章，未經 Apple 公證。
 
 ### 可攜式安裝
 
-1. 將 `LocalSRT-OnlineInstaller-v0.2.0.zip` 解壓縮到你想放置 Local SRT 的資料夾。
+1. 將 `LocalSRT-OnlineInstaller-v0.2.1.zip` 解壓縮到你想放置 Local SRT 的資料夾。
 2. 執行 `Install-LocalSRT-Portable.cmd`。
 3. 選擇執行環境：
    - `1` 代表 CPU，下載較小，適用大多數 Windows 電腦。
