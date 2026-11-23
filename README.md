@@ -1,8 +1,8 @@
 # Local SRT
 
-Local SRT is a desktop app for Windows and macOS built with MyGO. It turns audio and video files into `.srt` subtitles on your device after downloading the runtime and speech models.
+Local SRT is a desktop app for Windows and macOS. It turns audio and video files into `.srt` subtitles on your device after downloading the runtime and speech models.
 
-Local SRT 是一個使用 MyGO 開發的 Windows 和 macOS 桌面應用程式，可以把音訊和影片檔轉成 `.srt` 字幕檔。下載執行環境與模型後，語音辨識會在本機執行。
+Local SRT 是一個Windows和macOS桌面應用程式，可以把音訊和影片檔轉成 `.srt` 字幕檔。下載執行環境與模型後，語音辨識會在本機執行。
 
 ## Features
 
@@ -45,7 +45,7 @@ Run `Install-LocalSRT.cmd` from the release zip. This installs Local SRT under y
 
 <https://github.com/auodsgae/Local-srt/releases/latest>
 
-Windows x64 請執行 `LocalSRT-Setup-v0.2.1.exe`。Apple Silicon Mac（macOS 14 以上）請開啟 `LocalSRT-v0.2.1-macOS-arm64.dmg`，並將 Local SRT 拖入「應用程式」。Mac 版使用 CPU，第一次轉錄時會下載執行環境。Mac 版採用 ad hoc 簽章，未經 Apple 公證。
+Windows x64 請執行 `LocalSRT-Setup-v0.2.1.exe`。Apple Silicon Mac（macOS 14 以上）請開啟 `LocalSRT-v0.2.1-macOS-arm64.dmg`，並將 Local SRT 拖入「應用程式」。Mac 版使用 CPU，第一次轉錄時會下載執行環境。Mac 版採用ad hoc簽章，未經Apple公證。
 
 ### 可攜式安裝
 
